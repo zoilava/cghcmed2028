@@ -1,0 +1,1129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Medicine 2028 Class Fund Tracker</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#4f46e5',
+                        secondary: '#10b981',
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        
+        /* Elegant custom scrollbar */
+        .table-scroll::-webkit-scrollbar { height: 6px; width: 6px; }
+        .table-scroll::-webkit-scrollbar-track { background: transparent; }
+        .table-scroll::-webkit-scrollbar-thumb { background-color: #cbd5e1; border-radius: 10px; }
+        .table-scroll::-webkit-scrollbar-thumb:hover { background-color: #94a3b8; }
+        
+        /* Modal transitions */
+        .modal { opacity: 0; pointer-events: none; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); backdrop-filter: blur(4px); }
+        .modal.active { opacity: 1; pointer-events: auto; }
+        .modal-content { transform: scale(0.95) translateY(10px); transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+        .modal.active .modal-content { transform: scale(1) translateY(0); }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-slate-50 to-slate-100 text-slate-800 font-sans antialiased min-h-screen pb-20 selection:bg-indigo-100 selection:text-indigo-900">
+
+    <!-- Header (Glassmorphism) -->
+    <header class="bg-white/80 backdrop-blur-md shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)] sticky top-0 z-10 border-b border-slate-200/50 transition-all">
+        <div class="max-w-6xl mx-auto px-4 py-4 lg:py-5 flex flex-col md:flex-row justify-between items-center gap-4">
+            <div class="flex items-center gap-3 w-full md:w-auto justify-between md:justify-start">
+                <div class="flex items-center gap-3">
+                    <div class="bg-indigo-100 p-2 rounded-xl text-indigo-600">
+                        <i data-lucide="piggy-bank" class="h-7 w-7"></i>
+                    </div>
+                    <div>
+                        <h1 class="text-xl font-bold text-slate-900 leading-tight">Medicine 2028</h1>
+                        <p class="text-xs text-slate-500 font-medium tracking-wide uppercase">Class Fund Tracker</p>
+                    </div>
+                </div>
+                <span id="viewOnlyBadge" class="hidden bg-sky-100 text-sky-700 text-[10px] font-bold px-2.5 py-1 rounded-full uppercase tracking-wider shadow-sm border border-sky-200">View Only</span>
+            </div>
+            
+            <div class="flex items-center gap-4 md:gap-6 w-full md:w-auto justify-between md:justify-end bg-white md:bg-transparent p-3 md:p-0 rounded-2xl md:rounded-none shadow-sm md:shadow-none border border-slate-100 md:border-none">
+                <button id="shareLinkBtn" onclick="copyViewerLink()" class="hidden text-sm text-indigo-600 hover:text-indigo-700 flex items-center gap-1.5 font-medium bg-indigo-50/50 hover:bg-indigo-100 px-3 py-2 rounded-xl transition-all">
+                    <i data-lucide="share-2" class="h-4 w-4"></i> <span class="hidden sm:inline">Share View</span>
+                </button>
+                <div class="flex gap-4 sm:gap-6 items-center">
+                    <div class="text-right hidden sm:block">
+                        <p class="text-[10px] text-slate-400 uppercase tracking-wider font-semibold">Total Income</p>
+                        <p class="text-lg font-bold text-emerald-500" id="totalIncomeDisplay">₱0.00</p>
+                    </div>
+                    <div class="text-right hidden sm:block">
+                        <p class="text-[10px] text-slate-400 uppercase tracking-wider font-semibold">Total Expenses</p>
+                        <p class="text-lg font-bold text-rose-500" id="totalExpenseDisplay">₱0.00</p>
+                    </div>
+                    <!-- NEW: Receivables Header -->
+                    <div class="text-right hidden md:block md:border-l md:border-slate-200 md:pl-6">
+                        <p class="text-[10px] text-slate-400 uppercase tracking-wider font-semibold">Receivables (Unpaid)</p>
+                        <p class="text-lg font-bold text-amber-500" id="totalReceivablesDisplay">₱0.00</p>
+                    </div>
+                    <div class="text-right border-l border-slate-200 pl-4 sm:pl-6">
+                        <p class="text-[10px] text-slate-400 uppercase tracking-wider font-semibold">Net Balance</p>
+                        <p class="text-2xl font-black text-indigo-600 tracking-tight" id="totalBalanceDisplay">₱0.00</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-6xl mx-auto px-4 py-8 space-y-12">
+        
+        <!-- Funds Section -->
+        <section>
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-lg font-bold text-slate-800 flex items-center gap-2">
+                    <i data-lucide="layout-grid" class="h-5 w-5 text-indigo-500"></i> Active Funds
+                </h2>
+                <button id="newFundBtn" onclick="openFundModal()" class="bg-slate-900 hover:bg-indigo-600 text-white px-4 py-2.5 rounded-xl text-sm font-semibold transition-all shadow-md hover:shadow-lg flex items-center gap-2 transform hover:-translate-y-0.5">
+                    <i data-lucide="plus" class="h-4 w-4"></i> New Fund
+                </button>
+            </div>
+            
+            <div id="fundList" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                <!-- Funds will be rendered here -->
+                <div class="col-span-full text-center py-12 text-slate-400 bg-white/50 rounded-2xl border border-slate-200 border-dashed" id="emptyFundsMsg">
+                    <i data-lucide="folder-open" class="h-10 w-10 mx-auto mb-3 opacity-50"></i>
+                    <p>Loading funds...</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Analytics Section -->
+        <section class="bg-white/80 backdrop-blur-sm p-6 lg:p-8 rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-slate-100 hidden" id="chartSection">
+            <h2 class="text-lg font-bold text-slate-800 flex items-center gap-2 mb-8">
+                <i data-lucide="pie-chart" class="h-5 w-5 text-indigo-500"></i> Financial Overview
+            </h2>
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-10">
+                <!-- Fund Balances Bar Chart -->
+                <div class="w-full relative flex flex-col">
+                    <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-6 text-center">Fund Balances</h3>
+                    <div class="relative w-full" style="height: 280px;">
+                        <canvas id="fundChart"></canvas>
+                    </div>
+                </div>
+                <!-- Income vs Expense Doughnut Chart -->
+                <div class="w-full relative flex flex-col border-t lg:border-t-0 lg:border-l border-slate-100 pt-8 lg:pt-0 lg:pl-10">
+                    <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-6 text-center">Total Income vs Expenses</h3>
+                    <div class="relative w-full" style="height: 280px;">
+                        <canvas id="incomeExpenseChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Transactions Section -->
+        <section>
+            <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-6 gap-4">
+                <h2 class="text-lg font-bold text-slate-800 flex items-center gap-2">
+                    <i data-lucide="list-ordered" class="h-5 w-5 text-indigo-500"></i> Transaction Ledger
+                </h2>
+                <div class="flex flex-wrap gap-3 w-full lg:w-auto justify-start lg:justify-end">
+                    <!-- Search Bar -->
+                    <div class="relative w-full sm:w-48 lg:w-56">
+                        <i data-lucide="search" class="absolute left-3 top-2.5 h-4 w-4 text-slate-400"></i>
+                        <input type="text" id="txSearch" onkeyup="renderTransactions()" placeholder="Search entries..." class="w-full pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all shadow-sm">
+                    </div>
+                    <!-- Sorting Dropdown -->
+                    <select id="txSort" onchange="renderTransactions()" class="bg-white border border-slate-200 text-slate-600 px-3 py-2 rounded-xl text-sm font-medium outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all shadow-sm cursor-pointer">
+                        <option value="newest">Newest First</option>
+                        <option value="oldest">Oldest First</option>
+                        <option value="high">Highest Amount</option>
+                        <option value="low">Lowest Amount</option>
+                    </select>
+                    <!-- Action Buttons -->
+                    <button onclick="exportCSV()" class="bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-3 py-2 rounded-xl text-sm font-semibold transition-all shadow-sm flex items-center gap-2">
+                        <i data-lucide="download" class="h-4 w-4"></i> <span class="hidden sm:inline">Export</span>
+                    </button>
+                    <button id="addEntryBtn" onclick="openTxModal()" class="bg-emerald-500 hover:bg-emerald-600 text-white px-4 py-2 rounded-xl text-sm font-semibold transition-all shadow-[0_4px_14px_0_rgba(16,185,129,0.39)] hover:shadow-[0_6px_20px_rgba(16,185,129,0.23)] flex items-center gap-2 transform hover:-translate-y-0.5">
+                        <i data-lucide="plus" class="h-4 w-4"></i> Add Entry
+                    </button>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-slate-100 overflow-hidden">
+                <div class="overflow-x-auto table-scroll">
+                    <table class="w-full text-left border-collapse min-w-[850px]">
+                        <thead>
+                            <tr class="bg-slate-50/50 border-b border-slate-200 text-xs text-slate-400 uppercase tracking-widest">
+                                <th class="p-5 font-bold">Payment / Encode Date</th>
+                                <th class="p-5 font-bold">Contributor / Note</th>
+                                <th class="p-5 font-bold text-center">Ref No.</th>
+                                <th class="p-5 font-bold text-center">Term</th>
+                                <th class="p-5 font-bold">Fund</th>
+                                <th class="p-5 font-bold text-center">Type / Status</th>
+                                <th class="p-5 font-bold text-right">Amount</th>
+                                <th id="actionHeader" class="p-5 font-bold text-center w-16"></th>
+                            </tr>
+                        </thead>
+                        <tbody id="transactionList" class="divide-y divide-slate-100 text-sm">
+                            <!-- Transactions will be rendered here -->
+                        </tbody>
+                    </table>
+                </div>
+                <div id="emptyTxMsg" class="text-center py-12 text-slate-400 hidden bg-slate-50/30">
+                    <i data-lucide="inbox" class="h-10 w-10 mx-auto mb-3 opacity-50"></i>
+                    <p>No transactions found.</p>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Modal: Add/Edit Fund -->
+    <div id="fundModal" class="modal fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4">
+        <div class="modal-content bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden border border-slate-100">
+            <div class="px-6 py-5 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+                <h3 class="text-lg font-bold text-slate-800 flex items-center gap-2" id="fundModalTitle">
+                    <i data-lucide="target" class="h-5 w-5 text-indigo-500"></i> Create New Fund
+                </h3>
+                <button onclick="closeModals()" class="text-slate-400 hover:text-slate-600 bg-white hover:bg-slate-100 p-1.5 rounded-full transition-colors border border-slate-200">
+                    <i data-lucide="x" class="h-4 w-4"></i>
+                </button>
+            </div>
+            <form id="fundForm" class="p-6 space-y-5">
+                <input type="hidden" id="fundId">
+                <div>
+                    <label class="block text-sm font-semibold text-slate-700 mb-1.5">Fund Name</label>
+                    <input type="text" id="fundName" required placeholder="e.g., Graduation Trip" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 focus:bg-white outline-none transition-all">
+                </div>
+                <div class="pt-4 flex justify-end gap-3">
+                    <button type="button" onclick="closeModals()" class="px-5 py-2.5 text-slate-600 hover:bg-slate-100 rounded-xl font-semibold transition-colors">Cancel</button>
+                    <button type="submit" class="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-semibold transition-all shadow-md hover:shadow-lg">Save Fund</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal: Add Transaction -->
+    <div id="txModal" class="modal fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4">
+        <div class="modal-content bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden border border-slate-100">
+            <div class="px-6 py-5 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+                <h3 class="text-lg font-bold text-slate-800 flex items-center gap-2" id="txModalTitle">
+                    <i data-lucide="receipt" class="h-5 w-5 text-emerald-500"></i> Record Transaction
+                </h3>
+                <button onclick="closeModals()" class="text-slate-400 hover:text-slate-600 bg-white hover:bg-slate-100 p-1.5 rounded-full transition-colors border border-slate-200">
+                    <i data-lucide="x" class="h-4 w-4"></i>
+                </button>
+            </div>
+            <!-- Added max-height and overflow to handle larger form on small screens -->
+            <form id="txForm" class="p-6 space-y-4 max-h-[75vh] overflow-y-auto custom-scroll table-scroll">
+                <input type="hidden" id="txId">
+                <!-- NEW: Unpaid/Paid Selection -->
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-semibold text-slate-700 mb-2">Transaction Type</label>
+                        <div class="flex gap-2">
+                            <label class="cursor-pointer flex-1">
+                                <input type="radio" name="txType" id="typeIncome" value="income" checked class="peer sr-only">
+                                <div class="text-center px-3 py-2 border-2 border-slate-100 rounded-xl peer-checked:bg-emerald-50 peer-checked:border-emerald-500 peer-checked:text-emerald-700 font-bold transition-all text-sm shadow-sm hover:border-slate-300">
+                                    <i data-lucide="trending-up" class="h-4 w-4 inline-block mr-1"></i> In
+                                </div>
+                            </label>
+                            <label class="cursor-pointer flex-1">
+                                <input type="radio" name="txType" id="typeExpense" value="expense" class="peer sr-only">
+                                <div class="text-center px-3 py-2 border-2 border-slate-100 rounded-xl peer-checked:bg-rose-50 peer-checked:border-rose-500 peer-checked:text-rose-700 font-bold transition-all text-sm shadow-sm hover:border-slate-300">
+                                    <i data-lucide="trending-down" class="h-4 w-4 inline-block mr-1"></i> Out
+                                </div>
+                            </label>
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-semibold text-slate-700 mb-2">Payment Status</label>
+                        <div class="flex gap-2">
+                            <label class="cursor-pointer flex-1">
+                                <input type="radio" name="txStatus" id="statusPaid" value="paid" checked class="peer sr-only">
+                                <div class="text-center px-3 py-2 border-2 border-slate-100 rounded-xl peer-checked:bg-indigo-50 peer-checked:border-indigo-500 peer-checked:text-indigo-700 font-bold transition-all text-sm shadow-sm hover:border-slate-300">
+                                    Paid
+                                </div>
+                            </label>
+                            <label class="cursor-pointer flex-1">
+                                <input type="radio" name="txStatus" id="statusUnpaid" value="unpaid" class="peer sr-only">
+                                <div class="text-center px-3 py-2 border-2 border-slate-100 rounded-xl peer-checked:bg-amber-50 peer-checked:border-amber-500 peer-checked:text-amber-700 font-bold transition-all text-sm shadow-sm hover:border-slate-300">
+                                    Unpaid
+                                </div>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-semibold text-slate-700 mb-1.5">Contributor / Note</label>
+                    <input type="text" id="txName" required placeholder="e.g., John Doe / Venue Deposit" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 focus:bg-white outline-none transition-all">
+                </div>
+
+                <!-- Payment Date Field -->
+                <div>
+                    <label class="block text-sm font-semibold text-slate-700 mb-1.5">Payment Date <span class="text-xs font-normal text-slate-500 block sm:inline mt-1 sm:mt-0">(Encoded date saves automatically)</span></label>
+                    <input type="date" id="txPaymentDate" required class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 focus:bg-white outline-none transition-all cursor-pointer">
+                </div>
+
+                <!-- Year Level & Semester Dropdowns -->
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-sm font-semibold text-slate-700 mb-1.5">Year Level</label>
+                        <select id="txYearLevel" required class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 focus:bg-white outline-none transition-all cursor-pointer">
+                            <option value="N/A">N/A</option>
+                            <option value="YL1">YL1</option>
+                            <option value="YL2" selected>YL2</option>
+                            <option value="YL3">YL3</option>
+                            <option value="YL4">YL4</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold text-slate-700 mb-1.5">Semester</label>
+                        <select id="txSemester" required class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 focus:bg-white outline-none transition-all cursor-pointer">
+                            <option value="N/A">N/A</option>
+                            <option value="1st Semester" selected>1st Semester</option>
+                            <option value="2nd Semester">2nd Semester</option>
+                            <option value="Summer">Summer</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Fund & Payment Method Dropdowns -->
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-sm font-semibold text-slate-700 mb-1.5">Select Fund</label>
+                        <select id="txFundId" required class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 focus:bg-white outline-none transition-all cursor-pointer">
+                            <!-- Populated by JS -->
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold text-slate-700 mb-1.5">Payment Method</label>
+                        <select id="txMethod" required class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 focus:bg-white outline-none transition-all cursor-pointer">
+                            <option value="" disabled selected>Select...</option>
+                            <option value="Cash">Cash</option>
+                            <option value="GoTyme">GoTyme</option>
+                            <option value="MariBank">MariBank</option>
+                            <option value="GCash">GCash</option>
+                            <option value="RCBC">RCBC</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-sm font-semibold text-slate-700 mb-1.5">Reference No. <span class="text-xs font-normal text-slate-400">(Optional)</span></label>
+                        <input type="text" id="txRefNo" placeholder="e.g., 012345" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 focus:bg-white outline-none transition-all">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold text-slate-700 mb-1.5">Amount (₱)</label>
+                        <div class="relative">
+                            <span class="absolute left-4 top-3.5 font-bold text-slate-400">₱</span>
+                            <input type="number" id="txAmount" required step="0.01" min="0.01" placeholder="0.00" class="w-full pl-9 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 focus:bg-white outline-none transition-all font-semibold">
+                        </div>
+                    </div>
+                </div>
+                <div class="pt-4 flex justify-end gap-3 sticky bottom-0 bg-white pb-2">
+                    <button type="button" onclick="closeModals()" class="px-5 py-2.5 text-slate-600 hover:bg-slate-100 rounded-xl font-semibold transition-colors">Cancel</button>
+                    <button type="submit" class="px-6 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl font-semibold transition-all shadow-md hover:shadow-lg">Record Entry</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal: Confirmation -->
+    <div id="confirmModal" class="modal fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/50 px-4">
+        <div class="modal-content bg-white rounded-3xl shadow-2xl w-full max-w-sm overflow-hidden p-6 text-center border border-slate-100">
+            <div class="w-14 h-14 rounded-full bg-rose-100 flex items-center justify-center mx-auto mb-4 border-4 border-white shadow-sm">
+                <i data-lucide="alert-triangle" class="h-6 w-6 text-rose-600"></i>
+            </div>
+            <h3 class="text-xl font-bold text-slate-800 mb-2">Are you sure?</h3>
+            <p id="confirmMessage" class="text-sm text-slate-500 mb-8 leading-relaxed">This action cannot be undone.</p>
+            <div class="flex justify-center gap-3">
+                <button onclick="closeConfirm()" class="flex-1 py-3 text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-xl font-bold transition-colors">Cancel</button>
+                <button onclick="executeConfirm()" class="flex-1 py-3 bg-rose-600 hover:bg-rose-700 text-white rounded-xl font-bold transition-all shadow-md hover:shadow-lg">Yes, Delete</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Firebase SDK & Application Logic -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, addDoc, deleteDoc, doc, updateDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        lucide.createIcons();
+
+        // EXACT Firebase config provided by the user
+        const firebaseConfig = {
+            apiKey: "AIzaSyBOyLQxuvtE8DWRWROZfViRdrpKewFmrls",
+            authDomain: "medicine-2028-tracker.firebaseapp.com",
+            projectId: "medicine-2028-tracker",
+            storageBucket: "medicine-2028-tracker.firebasestorage.app",
+            messagingSenderId: "932356682377",
+            appId: "1:932356682377:web:8059a2c25d9af2bde34c58"
+        };
+
+        let app, auth, db;
+        const appId = 'class-fund-tracker-default'; // Shared collection key
+
+        try {
+            app = initializeApp(firebaseConfig);
+            auth = getAuth(app);
+            db = getFirestore(app);
+            initAuth();
+        } catch (error) {
+            console.error("Firebase Initialization Failed. Check your config.", error);
+            showToast("Database connection failed. Features disabled.", true);
+        }
+
+        let currentUser = null;
+        let funds = [];
+        let transactions = [];
+        let unsubFunds = null;
+        let unsubTxs = null;
+        let fundChartInstance = null;
+        let incomeExpenseChartInstance = null;
+
+        const isViewOnly = new URLSearchParams(window.location.search).get('view') === 'true';
+
+        if (isViewOnly) {
+            document.getElementById('viewOnlyBadge').classList.remove('hidden');
+            document.getElementById('newFundBtn').classList.add('hidden');
+            document.getElementById('addEntryBtn').classList.add('hidden');
+            document.getElementById('actionHeader').classList.add('hidden');
+        } else {
+            document.getElementById('shareLinkBtn').classList.remove('hidden');
+        }
+
+        async function initAuth() {
+            try {
+                await signInAnonymously(auth);
+            } catch (error) {
+                showToast("Authentication failed. Cannot sync data.", true);
+            }
+        }
+
+        if(auth) {
+            onAuthStateChanged(auth, (user) => {
+                currentUser = user;
+                if (user) {
+                    setupRealtimeListeners();
+                } else {
+                    if (unsubFunds) unsubFunds();
+                    if (unsubTxs) unsubTxs();
+                }
+            });
+        }
+
+        function setupRealtimeListeners() {
+            if (!currentUser) return;
+            const fundsRef = collection(db, 'artifacts', appId, 'public', 'data', 'funds');
+            const txsRef = collection(db, 'artifacts', appId, 'public', 'data', 'transactions');
+
+            unsubFunds = onSnapshot(fundsRef, (snapshot) => {
+                funds = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                renderApp();
+            }, (error) => console.error(error));
+
+            unsubTxs = onSnapshot(txsRef, (snapshot) => {
+                transactions = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                renderApp();
+            }, (error) => console.error(error));
+        }
+
+        window.renderApp = function() {
+            updateDashboardSummary();
+            renderFunds();
+            renderTransactions();
+            updateDropdown();
+            renderChart();
+            lucide.createIcons();
+        }
+
+        // Helper function to safely parse amounts containing commas or strings
+        function parseAmount(val) {
+            if (val === null || val === undefined) return 0;
+            const str = String(val).replace(/[^0-9.-]/g, '');
+            const parsed = parseFloat(str);
+            return isNaN(parsed) ? 0 : parsed;
+        }
+
+        function getMatchedFund(tx) {
+            const possibleIdentifiers = [
+                String(tx.fundId || ''),
+                String(tx.fundID || ''),
+                String(tx.fund || ''),
+                String(tx.fundName || '')
+            ].map(s => s.trim().toLowerCase()).filter(s => s !== '');
+
+            for (let idVal of possibleIdentifiers) {
+                const found = funds.find(f => 
+                    String(f.id).trim().toLowerCase() === idVal || 
+                    String(f.name).trim().toLowerCase() === idVal
+                );
+                if (found) return found;
+            }
+            return null;
+        }
+
+        function updateDashboardSummary() {
+            let globalIncome = 0;
+            let globalExpense = 0;
+            let globalReceivables = 0;
+
+            transactions.forEach(tx => {
+                const amount = parseAmount(tx.amount);
+                const isUnpaid = tx.status === 'unpaid';
+
+                if (amount >= 0) {
+                    if (isUnpaid) {
+                        globalReceivables += amount;
+                    } else {
+                        globalIncome += amount;
+                    }
+                } else {
+                    // Expenses are assumed paid, but if you want to track unpaid bills, 
+                    // you could add a logic branch here. For now, it subtracts from balance.
+                    if(!isUnpaid) globalExpense += Math.abs(amount);
+                }
+            });
+
+            const totalOverallBalance = globalIncome - globalExpense;
+
+            const incomeEl = document.getElementById('totalIncomeDisplay');
+            if (incomeEl) incomeEl.textContent = `₱${globalIncome.toFixed(2)}`;
+            
+            const expenseEl = document.getElementById('totalExpenseDisplay');
+            if (expenseEl) expenseEl.textContent = `₱${globalExpense.toFixed(2)}`;
+
+            const receivablesEl = document.getElementById('totalReceivablesDisplay');
+            if (receivablesEl) receivablesEl.textContent = `₱${globalReceivables.toFixed(2)}`;
+            
+            const balanceEl = document.getElementById('totalBalanceDisplay');
+            if (balanceEl) {
+                balanceEl.textContent = `₱${totalOverallBalance.toFixed(2)}`;
+                balanceEl.className = `text-2xl font-black tracking-tight ${totalOverallBalance < 0 ? 'text-rose-600' : 'text-indigo-600'}`;
+            }
+        }
+
+        // New calculation engine that perfectly matches the database using bulletproof fallback
+        function calculateFundBalance(fundObj) {
+            let total = 0;
+            transactions.forEach(tx => {
+                const matchedFund = getMatchedFund(tx);
+                if (matchedFund && matchedFund.id === fundObj.id) {
+                    // Only count paid transactions towards the actual balance
+                    if(tx.status !== 'unpaid') {
+                        const val = parseAmount(tx.amount);
+                        total += val;
+                    }
+                }
+            });
+            return total;
+        }
+
+        function renderFunds() {
+            const container = document.getElementById('fundList');
+            const emptyMsg = document.getElementById('emptyFundsMsg');
+
+            if (!container || !emptyMsg) return;
+
+            if (funds.length === 0) {
+                container.innerHTML = '';
+                emptyMsg.style.display = 'block';
+                document.getElementById('chartSection').classList.add('hidden');
+                return;
+            }
+
+            emptyMsg.style.display = 'none';
+            document.getElementById('chartSection').classList.remove('hidden');
+            container.innerHTML = '';
+
+            funds.forEach(fund => {
+                const actionsHtml = isViewOnly ? '' : `
+                    <div class="absolute top-4 right-4 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button onclick="editFund('${fund.id}')" class="text-slate-400 hover:text-indigo-600 bg-white hover:bg-indigo-50 p-1.5 rounded-full shadow-sm transition-all border border-slate-100" title="Edit Fund">
+                            <i data-lucide="edit-2" class="h-3.5 w-3.5"></i>
+                        </button>
+                        <button onclick="removeFund('${fund.id}')" class="text-slate-400 hover:text-rose-600 bg-white hover:bg-rose-50 p-1.5 rounded-full shadow-sm transition-all border border-slate-100" title="Delete Fund">
+                            <i data-lucide="trash-2" class="h-3.5 w-3.5"></i>
+                        </button>
+                    </div>
+                `;
+
+                const card = document.createElement('div');
+                card.className = "bg-white p-6 rounded-3xl border border-slate-100 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.03)] hover:shadow-[0_8px_30px_rgb(0,0,0,0.06)] transition-all duration-300 relative group transform hover:-translate-y-1 flex items-center justify-between";
+                
+                // Clean Minimalist Card Interface without the balance
+                card.innerHTML = `
+                    <div class="flex items-center gap-3 w-full">
+                        <div class="bg-indigo-50 p-3 rounded-2xl text-indigo-500 shrink-0">
+                            <i data-lucide="folder" class="h-6 w-6"></i>
+                        </div>
+                        <h3 class="font-bold text-slate-800 text-lg pr-14 truncate" title="${fund.name}">${fund.name}</h3>
+                    </div>
+                    ${actionsHtml}
+                `;
+                container.appendChild(card);
+            });
+        }
+
+        window.renderTransactions = function() {
+            const tbody = document.getElementById('transactionList');
+            const emptyMsg = document.getElementById('emptyTxMsg');
+            const searchInput = document.getElementById('txSearch');
+            const sortSelect = document.getElementById('txSort');
+            
+            const filterText = searchInput ? searchInput.value.toLowerCase() : '';
+            const sortMethod = sortSelect ? sortSelect.value : 'newest';
+
+            let filteredTxs = [...transactions];
+
+            if (filterText) {
+                filteredTxs = filteredTxs.filter(tx => {
+                    const fundObj = getMatchedFund(tx);
+                    const fundName = fundObj ? fundObj.name : '';
+                    return tx.name.toLowerCase().includes(filterText) || fundName.toLowerCase().includes(filterText);
+                });
+            }
+
+            filteredTxs.sort((a, b) => {
+                const aAmt = parseAmount(a.amount);
+                const bAmt = parseAmount(b.amount);
+                if(sortMethod === 'newest') return b.timestamp - a.timestamp;
+                if(sortMethod === 'oldest') return a.timestamp - b.timestamp;
+                if(sortMethod === 'high') return Math.abs(bAmt) - Math.abs(aAmt);
+                if(sortMethod === 'low') return Math.abs(aAmt) - Math.abs(bAmt);
+            });
+
+            if (filteredTxs.length === 0) {
+                tbody.innerHTML = '';
+                emptyMsg.classList.remove('hidden');
+                return;
+            }
+
+            emptyMsg.classList.add('hidden');
+            tbody.innerHTML = '';
+
+            filteredTxs.forEach(tx => {
+                const fundObj = getMatchedFund(tx);
+                
+                let fundCellHtml = '';
+                if (fundObj) {
+                    fundCellHtml = `<span class="inline-block bg-slate-100 text-slate-600 px-2.5 py-1 rounded-lg text-xs font-semibold">${fundObj.name}</span>`;
+                } else {
+                    const options = funds.map(f => `<option value="${f.id}">${f.name}</option>`).join('');
+                    fundCellHtml = isViewOnly ? `<span class="inline-block bg-rose-100 text-rose-700 px-2.5 py-1 rounded-lg text-xs font-semibold">Deleted Fund</span>` : `
+                        <div class="flex flex-col gap-1.5 w-32">
+                            <span class="inline-block bg-rose-100 text-rose-700 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider text-center shadow-sm" title="The fund for this entry was deleted.">⚠️ Unlinked</span>
+                            <select onchange="relinkTransaction('${tx.id}', this.value)" class="w-full text-xs border border-rose-200 text-slate-600 rounded-md p-1 bg-white shadow-sm outline-none focus:ring-2 focus:ring-rose-500/20 cursor-pointer">
+                                <option value="" disabled selected>Select new fund...</option>
+                                ${options}
+                            </select>
+                        </div>
+                    `;
+                }
+                
+                // Use payment date for main display, fallback to timestamp if missing
+                const entryDateObj = new Date(tx.timestamp);
+                const pDateObj = tx.paymentDate ? new Date(tx.paymentDate) : entryDateObj;
+                const pDateStr = pDateObj.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+                
+                const yLevelStr = tx.yearLevel && tx.yearLevel !== 'N/A' ? tx.yearLevel : '';
+                const semStr = tx.semester && tx.semester !== 'N/A' ? tx.semester : '';
+                
+                let termBadgeHtml = '';
+                if (yLevelStr || semStr) {
+                    termBadgeHtml = `
+                        <div class="flex gap-1 items-center justify-center">
+                            ${yLevelStr ? `<span class="inline-block bg-blue-50 text-blue-700 px-2 py-0.5 rounded text-[10px] font-bold border border-blue-100 uppercase tracking-wider">${yLevelStr}</span>` : ''}
+                            ${semStr ? `<span class="inline-block bg-purple-50 text-purple-700 px-2 py-0.5 rounded text-[10px] font-bold border border-purple-100 uppercase tracking-wider">${semStr}</span>` : ''}
+                        </div>
+                    `;
+                } else {
+                    termBadgeHtml = `<span class="text-xs text-slate-400 font-medium">-</span>`;
+                }
+
+                const amount = parseAmount(tx.amount);
+                const isIncome = amount >= 0;
+                const amountColor = isIncome ? 'text-emerald-600' : 'text-rose-600';
+                const amountPrefix = isIncome ? '+' : '';
+                
+                const methodStr = tx.paymentMethod || 'N/A';
+                const refNoStr = tx.referenceNumber ? tx.referenceNumber : '-';
+                const isUnpaid = tx.status === 'unpaid';
+
+                const typeIcon = isIncome ? 'trending-up' : 'trending-down';
+                const typeBadge = isIncome 
+                    ? `<span class="inline-flex items-center gap-1 bg-emerald-50 text-emerald-700 px-2.5 py-1 rounded-lg text-xs font-bold border border-emerald-100"><i data-lucide="${typeIcon}" class="h-3 w-3"></i> Income</span>`
+                    : `<span class="inline-flex items-center gap-1 bg-rose-50 text-rose-700 px-2.5 py-1 rounded-lg text-xs font-bold border border-rose-100"><i data-lucide="${typeIcon}" class="h-3 w-3"></i> Expense</span>`;
+
+                const statusBadge = isUnpaid 
+                    ? `<div class="mt-1.5"><span class="inline-flex items-center text-amber-700 px-2 py-0.5 rounded text-[10px] font-bold uppercase border border-amber-200 bg-amber-50 shadow-sm" title="Payment Pending"><i data-lucide="clock-4" class="h-3 w-3 mr-1"></i> Unpaid</span></div>`
+                    : `<div class="mt-1.5"><span class="inline-flex items-center text-slate-500 px-2 py-0.5 rounded text-[10px] font-bold uppercase border border-slate-200 bg-white shadow-sm" title="Payment Method"><i data-lucide="wallet" class="h-3 w-3 mr-1"></i> ${methodStr}</span></div>`;
+
+                const actionCellHtml = isViewOnly ? '<td class="p-5"></td>' : `
+                    <td class="p-5 border-b border-slate-100 text-center">
+                        <div class="flex items-center justify-center gap-1">
+                            <button onclick="editTransaction('${tx.id}')" class="text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 p-2 rounded-xl transition-all" title="Edit Entry">
+                                <i data-lucide="edit-2" class="h-4 w-4"></i>
+                            </button>
+                            <button onclick="removeTransaction('${tx.id}')" class="text-slate-400 hover:text-rose-600 hover:bg-rose-50 p-2 rounded-xl transition-all" title="Delete Entry">
+                                <i data-lucide="trash-2" class="h-4 w-4"></i>
+                            </button>
+                        </div>
+                    </td>
+                `;
+
+                const tr = document.createElement('tr');
+                tr.className = "hover:bg-slate-50/50 transition-colors group";
+                tr.innerHTML = `
+                    <td class="p-5 border-b border-slate-100">
+                        <div class="font-bold text-slate-800 flex items-center gap-1.5" title="Date Actually Paid"><i data-lucide="calendar-check" class="h-4 w-4 text-emerald-500"></i> ${pDateStr}</div>
+                        <div class="text-[10px] font-semibold text-slate-400 uppercase mt-1 flex items-center gap-1" title="Date Encoded in System"><i data-lucide="clock" class="h-3 w-3"></i> Encoded: ${entryDateObj.toLocaleDateString()}</div>
+                    </td>
+                    <td class="p-5 border-b border-slate-100 font-semibold text-slate-700">${tx.name}</td>
+                    <td class="p-5 border-b border-slate-100 text-center font-mono text-xs text-slate-500">${refNoStr}</td>
+                    <td class="p-5 border-b border-slate-100 text-center">
+                        ${termBadgeHtml}
+                    </td>
+                    <td class="p-5 border-b border-slate-100">
+                        ${fundCellHtml}
+                    </td>
+                    <td class="p-5 border-b border-slate-100 text-center">
+                        ${typeBadge}
+                        ${statusBadge}
+                    </td>
+                    <td class="p-5 border-b border-slate-100 text-right font-black ${amountColor} tracking-tight opacity-${isUnpaid ? '50' : '100'}">
+                        ${amountPrefix}₱${Math.abs(amount).toFixed(2)}
+                    </td>
+                    ${actionCellHtml}
+                `;
+                tbody.appendChild(tr);
+            });
+            lucide.createIcons();
+        }
+
+        function updateDropdown() {
+            const select = document.getElementById('txFundId');
+            if(!select) return;
+            select.innerHTML = '<option value="" disabled selected>Select a fund...</option>';
+            funds.forEach(fund => {
+                const option = document.createElement('option');
+                option.value = fund.id;
+                option.textContent = fund.name;
+                select.appendChild(option);
+            });
+        }
+
+        function renderChart() {
+            const ctx = document.getElementById('fundChart')?.getContext('2d');
+            if(!ctx) return;
+            
+            const labels = funds.map(f => f.name);
+            const currentBalances = funds.map(f => calculateFundBalance(f));
+
+            if (fundChartInstance) fundChartInstance.destroy();
+            if (funds.length === 0) return;
+
+            Chart.defaults.font.family = "'Inter', sans-serif";
+            Chart.defaults.color = '#94a3b8';
+
+            fundChartInstance = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: 'Current Balance (₱)',
+                            data: currentBalances,
+                            backgroundColor: 'rgba(99, 102, 241, 0.9)',
+                            borderRadius: 6,
+                            borderSkipped: false,
+                            barPercentage: 0.6,
+                            categoryPercentage: 0.8
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: { grid: { display: false, drawBorder: false } },
+                        y: { 
+                            beginAtZero: true, 
+                            border: { dash: [4, 4] },
+                            grid: { color: '#f1f5f9', drawBorder: false },
+                            ticks: { callback: function(value) { return '₱' + value; } }
+                        }
+                    },
+                    plugins: {
+                        legend: { position: 'top', labels: { usePointStyle: true, padding: 20, font: { weight: 'bold', size: 11 } } },
+                        tooltip: {
+                            backgroundColor: 'rgba(15, 23, 42, 0.9)',
+                            padding: 12,
+                            cornerRadius: 8,
+                            callbacks: {
+                                label: function(context) { return ' ₱' + context.parsed.y.toFixed(2); }
+                            }
+                        }
+                    }
+                }
+            });
+
+            const pieCtx = document.getElementById('incomeExpenseChart').getContext('2d');
+            if (incomeExpenseChartInstance) incomeExpenseChartInstance.destroy();
+
+            let totalInc = 0;
+            let totalExp = 0;
+            let totalUnpaid = 0;
+
+            transactions.forEach(tx => {
+                const amt = parseAmount(tx.amount);
+                const isUnpaid = tx.status === 'unpaid';
+                
+                if (amt >= 0) {
+                    if(isUnpaid) totalUnpaid += amt;
+                    else totalInc += amt;
+                } else {
+                    if(!isUnpaid) totalExp += Math.abs(amt);
+                }
+            });
+
+            const hasData = totalInc > 0 || totalExp > 0 || totalUnpaid > 0;
+
+            incomeExpenseChartInstance = new Chart(pieCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Income (Paid)', 'Expenses', 'Receivables (Unpaid)'],
+                    datasets: [{
+                        data: hasData ? [totalInc, totalExp, totalUnpaid] : [1, 1, 1],
+                        backgroundColor: hasData ? ['#10b981', '#f43f5e', '#f59e0b'] : ['#f1f5f9', '#f8fafc', '#f1f5f9'],
+                        borderWidth: 0,
+                        cutout: '75%',
+                        hoverOffset: 4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'bottom', labels: { usePointStyle: true, padding: 20, font: { weight: 'bold', size: 12 } } },
+                        tooltip: {
+                            backgroundColor: 'rgba(15, 23, 42, 0.9)',
+                            padding: 12,
+                            cornerRadius: 8,
+                            callbacks: {
+                                label: function(context) {
+                                    if (!hasData) return 'No data yet';
+                                    return ` ₱${(context.raw || 0).toFixed(2)}`;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        window.relinkTransaction = async function(txId, newFundId) {
+            if (!currentUser || !db) return showToast("Database not connected.", true);
+            try {
+                await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'transactions', txId), { 
+                    fundId: newFundId 
+                });
+                showToast("Transaction successfully linked!");
+            } catch (error) {
+                console.error("Error relinking:", error);
+                showToast("Error linking transaction.", true);
+            }
+        };
+
+        window.saveFund = async function(e) {
+            e.preventDefault();
+            if (!currentUser || !db) return showToast("Database not connected.", true);
+
+            const id = document.getElementById('fundId').value;
+            const name = document.getElementById('fundName').value.trim();
+
+            if (!name) return showToast("Invalid inputs.", true);
+
+            try {
+                const fundsRef = collection(db, 'artifacts', appId, 'public', 'data', 'funds');
+                if (id) {
+                    await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'funds', id), { name });
+                    showToast("Fund updated!");
+                } else {
+                    await addDoc(fundsRef, { name });
+                    showToast("Fund created successfully!");
+                }
+                closeModals();
+            } catch (error) {
+                showToast("Error saving fund.", true);
+            }
+        }; 
+
+        window.removeFund = function(id) {
+            if (!currentUser || !db) return;
+            showConfirm("Delete this fund? Transactions will remain but show as 'Unlinked' in the ledger.", async () => {
+                try {
+                    await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'funds', id));
+                    showToast("Fund deleted.");
+                } catch (error) {
+                    showToast("Error deleting fund.", true);
+                }
+            });
+        };
+
+        window.saveTransaction = async function(e) {
+            e.preventDefault();
+            if (!currentUser || !db) return showToast("Database not connected.", true);
+
+            const txId = document.getElementById('txId').value;
+            const isIncome = document.getElementById('typeIncome').checked;
+            const isUnpaid = document.getElementById('statusUnpaid').checked;
+            const name = document.getElementById('txName').value.trim();
+            const fundId = document.getElementById('txFundId').value;
+            const paymentMethod = document.getElementById('txMethod').value;
+            let amount = parseFloat(document.getElementById('txAmount').value);
+            
+            // New Fields
+            const paymentDate = document.getElementById('txPaymentDate').value;
+            const yearLevel = document.getElementById('txYearLevel').value;
+            const semester = document.getElementById('txSemester').value;
+            const referenceNumber = document.getElementById('txRefNo').value.trim();
+
+            if (!name || !fundId || !paymentMethod || isNaN(amount) || amount <= 0 || !paymentDate) {
+                return showToast("Please fill all required fields properly.", true);
+            }
+
+            amount = isIncome ? Math.abs(amount) : -Math.abs(amount);
+            const status = isUnpaid ? 'unpaid' : 'paid';
+
+            try {
+                if (txId) {
+                    await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'transactions', txId), { 
+                        name, 
+                        fundId, 
+                        amount, 
+                        paymentDate,
+                        yearLevel,
+                        semester,
+                        paymentMethod,
+                        referenceNumber,
+                        status
+                    });
+                    showToast("Transaction updated!");
+                } else {
+                    const txsRef = collection(db, 'artifacts', appId, 'public', 'data', 'transactions');
+                    await addDoc(txsRef, { 
+                        name, 
+                        fundId, 
+                        amount, 
+                        paymentDate,
+                        yearLevel,
+                        semester,
+                        paymentMethod,
+                        referenceNumber,
+                        status,
+                        timestamp: Date.now() 
+                    });
+                    showToast("Transaction recorded!");
+                }
+                closeModals();
+            } catch (error) {
+                showToast("Error saving transaction.", true);
+            }
+        };
+
+        window.removeTransaction = function(id) {
+            if (!currentUser || !db) return;
+            showConfirm("Delete this transaction? This will affect the fund balance.", async () => {
+                try {
+                    await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'transactions', id));
+                    showToast("Transaction deleted.");
+                } catch (error) {
+                    showToast("Error deleting transaction.", true);
+                }
+            });
+        }
+
+        window.exportCSV = function() {
+            if (transactions.length === 0) return showToast("No data to export.", true);
+            
+            let csvContent = "data:text/csv;charset=utf-8,";
+            
+            let gInc = 0, gExp = 0, gRec = 0;
+            transactions.forEach(t => {
+                const amt = parseAmount(t.amount);
+                const isUnpaid = t.status === 'unpaid';
+                if (amt >= 0) {
+                    if(isUnpaid) gRec += amt;
+                    else gInc += amt;
+                } else {
+                    if(!isUnpaid) gExp += Math.abs(amt);
+                }
+            });
+            csvContent += `Summary:,Total Income:,${gInc},Total Expense:,${gExp},Net Balance:,${gInc - gExp},Receivables:,${gRec}\n\n`;
+            
+            // Updated Headers
+            csvContent += "Recorded Date,Payment Date,Year Level,Semester,Contributor/Note,Reference Number,Amount,Fund Name,Type,Status,Payment Method\n";
+            transactions.forEach(tx => {
+                const dateObj = new Date(tx.timestamp);
+                const fundObj = getMatchedFund(tx);
+                const fundName = fundObj ? fundObj.name : 'Unlinked Transaction';
+                
+                const amount = parseAmount(tx.amount);
+                const type = amount >= 0 ? "Income" : "Expense";
+                const cleanName = tx.name.replace(/"/g, '""');
+                
+                const payDate = tx.paymentDate || "N/A";
+                const yLvl = tx.yearLevel || "N/A";
+                const sem = tx.semester || "N/A";
+                const method = tx.paymentMethod || "N/A";
+                const refNo = tx.referenceNumber ? tx.referenceNumber.replace(/"/g, '""') : "N/A";
+                const statusStr = tx.status === 'unpaid' ? "Unpaid" : "Paid";
+
+                csvContent += `"${dateObj.toLocaleDateString()}","${payDate}","${yLvl}","${sem}","${cleanName}","${refNo}","${amount}","${fundName}","${type}","${statusStr}","${method}"\n`;
+            });
+
+            const encodedUri = encodeURI(csvContent);
+            const link = document.createElement("a");
+            link.setAttribute("href", encodedUri);
+            link.setAttribute("download", `Class_Funds_${new Date().toISOString().split('T')[0]}.csv`);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            showToast("Export complete.");
+        };
+
+        window.copyViewerLink = function() {
+            const url = new URL(window.location.href);
+            url.searchParams.set('view', 'true');
+            const tempInput = document.createElement('input');
+            tempInput.value = url.href;
+            document.body.appendChild(tempInput);
+            tempInput.select();
+            try {
+                document.execCommand('copy');
+                showToast("Viewer link copied to clipboard!");
+            } catch (err) {
+                showToast("Failed to copy link.", true);
+            }
+            document.body.removeChild(tempInput);
+        };
+
+        window.openFundModal = function() {
+            document.getElementById('fundForm').reset();
+            document.getElementById('fundId').value = '';
+            document.getElementById('fundModalTitle').innerHTML = '<i data-lucide="target" class="h-5 w-5 text-indigo-500"></i> Create New Fund';
+            document.getElementById('fundModal').classList.add('active');
+            lucide.createIcons();
+        };
+
+        window.editFund = function(id) {
+            const fund = funds.find(f => String(f.id) === String(id));
+            if (!fund) return;
+            document.getElementById('fundId').value = fund.id;
+            document.getElementById('fundName').value = fund.name;
+            document.getElementById('fundModalTitle').innerHTML = '<i data-lucide="edit" class="h-5 w-5 text-indigo-500"></i> Edit Fund';
+            document.getElementById('fundModal').classList.add('active');
+            lucide.createIcons();
+        };
+
+        window.openTxModal = function() {
+            if(funds.length === 0) return showToast("Please create a fund first.", true);
+            document.getElementById('txForm').reset();
+            document.getElementById('txId').value = '';
+            document.getElementById('txModalTitle').innerHTML = '<i data-lucide="receipt" class="h-5 w-5 text-emerald-500"></i> Record Transaction';
+            
+            // Default payment date to today to save time
+            document.getElementById('txPaymentDate').valueAsDate = new Date();
+            document.getElementById('txModal').classList.add('active');
+            lucide.createIcons();
+        };
+
+        window.editTransaction = function(id) {
+            const tx = transactions.find(t => String(t.id) === String(id));
+            if (!tx) return;
+            
+            document.getElementById('txId').value = tx.id;
+            document.getElementById('txName').value = tx.name;
+            document.getElementById('txFundId').value = tx.fundId;
+            document.getElementById('txMethod').value = tx.paymentMethod;
+            document.getElementById('txYearLevel').value = tx.yearLevel;
+            document.getElementById('txSemester').value = tx.semester;
+            document.getElementById('txRefNo').value = tx.referenceNumber || '';
+            document.getElementById('txAmount').value = Math.abs(parseFloat(tx.amount));
+            
+            if (tx.paymentDate) {
+                document.getElementById('txPaymentDate').value = tx.paymentDate;
+            }
+
+            if (parseFloat(tx.amount) >= 0) {
+                document.getElementById('typeIncome').checked = true;
+            } else {
+                document.getElementById('typeExpense').checked = true;
+            }
+
+            if (tx.status === 'unpaid') {
+                document.getElementById('statusUnpaid').checked = true;
+            } else {
+                document.getElementById('statusPaid').checked = true;
+            }
+
+            document.getElementById('txModalTitle').innerHTML = '<i data-lucide="edit" class="h-5 w-5 text-indigo-500"></i> Edit Transaction';
+            document.getElementById('txModal').classList.add('active');
+            lucide.createIcons();
+        };
+
+        window.closeModals = function() {
+            document.querySelectorAll('.modal').forEach(m => m.classList.remove('active'));
+        };
+
+        let confirmActionCallback = null;
+        window.showConfirm = function(msg, callback) {
+            document.getElementById('confirmMessage').textContent = msg;
+            confirmActionCallback = callback;
+            document.getElementById('confirmModal').classList.add('active');
+        };
+        window.closeConfirm = function() {
+            document.getElementById('confirmModal').classList.remove('active');
+            confirmActionCallback = null;
+        };
+        window.executeConfirm = function() {
+            if (confirmActionCallback) confirmActionCallback();
+            closeConfirm();
+        };
+
+        window.showToast = function(msg, isError = false) {
+            const toast = document.createElement('div');
+            toast.className = `fixed bottom-6 right-6 z-[70] px-6 py-4 rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.12)] text-white text-sm font-bold transition-all transform translate-y-10 opacity-0 flex items-center gap-3 border ${isError ? 'bg-rose-600 border-rose-500' : 'bg-slate-900 border-slate-700'}`;
+            toast.innerHTML = `<i data-lucide="${isError ? 'alert-triangle' : 'check-circle-2'}" class="h-5 w-5 ${isError ? 'text-rose-200' : 'text-emerald-400'}"></i> ${msg}`;
+            document.body.appendChild(toast);
+            lucide.createIcons({root: toast});
+
+            setTimeout(() => toast.classList.remove('translate-y-10', 'opacity-0'), 10);
+            setTimeout(() => {
+                toast.classList.add('translate-y-10', 'opacity-0');
+                setTimeout(() => toast.remove(), 300);
+            }, 4000);
+        };
+
+        document.getElementById('fundForm').addEventListener('submit', saveFund);
+        document.getElementById('txForm').addEventListener('submit', saveTransaction);
+
+    </script>
+</body>
+</html>
